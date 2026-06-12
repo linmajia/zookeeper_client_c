@@ -485,13 +485,7 @@ int32_t inc_ref_counter(zhandle_t* zh,int i)
 int32_t fetch_and_add(volatile int32_t* operand, int incr)
 {
 #ifndef WIN32
-    int32_t result;
-    asm __volatile__(
-         "lock xaddl %0,%1\n"
-         : "=r"(result), "=m"(*(int *)operand)
-         : "0"(incr)
-         : "memory");
-   return result;
+    return __atomic_fetch_add(operand, incr, __ATOMIC_SEQ_CST);
 #else
     static_assert (sizeof(int32_t) == sizeof(LONG), 
         "int32_t and LONG size mismatch");
