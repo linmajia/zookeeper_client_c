@@ -156,17 +156,15 @@
 #define _WIN32_WINNT_NT4 0x0400
 #endif
 
-#ifndef NTDDI_VERSION
-#define NTDDI_VERSION _WIN32_WINNT_NT4
-#endif
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT _WIN32_WINNT_NT4
-#endif
+//#define NTDDI_VERSION _WIN32_WINNT_NT4
+//#define _WIN32_WINNT _WIN32_WINNT_NT4
 
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <Windows.h>
 #include <Winsock2.h>
 #include <winstdint.h>
@@ -190,8 +188,12 @@
 #define EHOSTDOWN EPIPE
 #define ESTALE ENODEV
 
+#ifndef EWOULDBLOCK
 #define EWOULDBLOCK WSAEWOULDBLOCK
+#endif
+#ifndef EINPROGRESS
 #define EINPROGRESS WSAEINPROGRESS
+#endif
 
 typedef int pid_t;
 #endif
