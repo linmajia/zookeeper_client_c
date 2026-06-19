@@ -188,8 +188,12 @@
 #define EHOSTDOWN EPIPE
 #define ESTALE ENODEV
 
+#ifndef EWOULDBLOCK
 #define EWOULDBLOCK WSAEWOULDBLOCK
+#endif
+#ifndef EINPROGRESS
 #define EINPROGRESS WSAEINPROGRESS
+#endif
 
 typedef int pid_t;
 #endif
