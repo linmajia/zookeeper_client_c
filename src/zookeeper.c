@@ -218,6 +218,15 @@ static ssize_t zookeeper_send(int s, const void* buf, size_t len)
 #endif
 }
 
+static int is_nonblocking_connect_in_progress(int socket_error)
+{
+#ifdef WIN32
+    return socket_error == WSAEWOULDBLOCK || socket_error == WSAEINPROGRESS;
+#else
+    return socket_error == EWOULDBLOCK || socket_error == EINPROGRESS;
+#endif
+}
+
 const void *zoo_get_context(zhandle_t *zh)
 {
     return zh->context;
@@ -765,7 +774,7 @@ zhandle_t *zookeeper_init(const char *host, watcher_fn watcher,
 {
     int errnosave = 0;
     zhandle_t *zh = NULL;
-    char *index_chroot = NULL;
+    const char *index_chroot = NULL;
 
     log_env();
 #ifdef WIN32
@@ -1472,7 +1481,7 @@ static int prime_connection(zhandle_t *zh)
     req.lastZxidSeen = zh->last_zxid;
     hlen = htonl(len);
     /* We are running fast and loose here, but this string should fit in the initial buffer! */
-    rc=zookeeper_send(zh->fd, &hlen, sizeof(len));
+    rc=zookeeper_send(zh->fd, (const char*)&hlen, sizeof(len));
     serialize_prime_connect(&req, buffer_req);
     rc=rc<0 ? rc : zookeeper_send(zh->fd, buffer_req, len);
     if (rc<0) {
@@ -1598,14 +1607,14 @@ int zookeeper_interest(zhandle_t *zh, int *fd, int *interest,
 #endif
                 rc = connect(zh->fd, (struct sockaddr*) &zh->addrs[zh->connect_index], sizeof(struct sockaddr_in));
 #ifdef WIN32
-                get_errno();
+                errno = WSAGetLastError();
 #endif
             }
             if (rc == -1) {
                 /* we are handling the non-blocking connect according to
                  * the description in section 16.3 "Non-blocking connect"
                  * in UNIX Network Programming vol 1, 3rd edition */
-                if (errno == EWOULDBLOCK || errno == EINPROGRESS)
+                if (is_nonblocking_connect_in_progress(errno))
                     zh->state = ZOO_CONNECTING_STATE;
                 else
                     return api_epilog(zh,handle_socket_error_msg(zh,__LINE__,
@@ -1689,7 +1698,11 @@ static int check_events(zhandle_t *zh, int events)
     if ((events&ZOOKEEPER_WRITE)&&(zh->state == ZOO_CONNECTING_STATE)) {
         int rc, error;
         socklen_t len = sizeof(error);
+#ifdef WIN32
+        rc = getsockopt(zh->fd, SOL_SOCKET, SO_ERROR, (char*)&error, &len);
+#else
         rc = getsockopt(zh->fd, SOL_SOCKET, SO_ERROR, &error, &len);
+#endif
         /* the description in section 16.4 "Non-blocking connect"
          * in UNIX Network Programming vol 1, 3rd edition, points out
          * that sometimes the error is in errno and sometimes in error */
@@ -3424,8 +3437,8 @@ int zoo_add_auth(zhandle_t *zh,const char* scheme,const char* cert,
 
 static const char* format_endpoint_info(const struct sockaddr_storage* ep)
 {
-    static char buf[128];
     char addrstr[128];
+    static char buf[sizeof(addrstr) + sizeof(":65535")];
     void *inaddr;
 #ifdef WIN32
     char * addrstring;
@@ -3447,10 +3460,10 @@ static const char* format_endpoint_info(const struct sockaddr_storage* ep)
 #endif
 #ifdef WIN32
     addrstring = inet_ntoa (*(struct in_addr*)inaddr); 
-    sprintf(buf,"%s:%d",addrstring,ntohs(port));
+    snprintf_z(buf, sizeof(buf), "%s:%d", addrstring, ntohs(port));
 #else
-    inet_ntop(ep->ss_family,inaddr,addrstr,sizeof(addrstr)-1);
-    sprintf(buf,"%s:%d",addrstr,ntohs(port));
+    inet_ntop(ep->ss_family, inaddr, addrstr, sizeof(addrstr)-1);
+    snprintf_z(buf, sizeof(buf), "%s:%d", addrstr, ntohs(port));
 #endif    
     return buf;
 }
