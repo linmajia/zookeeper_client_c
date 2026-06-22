@@ -218,6 +218,15 @@ static ssize_t zookeeper_send(int s, const void* buf, size_t len)
 #endif
 }
 
+static int is_nonblocking_connect_in_progress(int socket_error)
+{
+#ifdef WIN32
+    return socket_error == WSAEWOULDBLOCK || socket_error == WSAEINPROGRESS;
+#else
+    return socket_error == EWOULDBLOCK || socket_error == EINPROGRESS;
+#endif
+}
+
 const void *zoo_get_context(zhandle_t *zh)
 {
     return zh->context;
@@ -1598,14 +1607,14 @@ int zookeeper_interest(zhandle_t *zh, int *fd, int *interest,
 #endif
                 rc = connect(zh->fd, (struct sockaddr*) &zh->addrs[zh->connect_index], sizeof(struct sockaddr_in));
 #ifdef WIN32
-                get_errno();
+                errno = WSAGetLastError();
 #endif
             }
             if (rc == -1) {
                 /* we are handling the non-blocking connect according to
                  * the description in section 16.3 "Non-blocking connect"
                  * in UNIX Network Programming vol 1, 3rd edition */
-                if (errno == EWOULDBLOCK || errno == EINPROGRESS)
+                if (is_nonblocking_connect_in_progress(errno))
                     zh->state = ZOO_CONNECTING_STATE;
                 else
                     return api_epilog(zh,handle_socket_error_msg(zh,__LINE__,
