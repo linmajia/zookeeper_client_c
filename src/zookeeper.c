@@ -1481,7 +1481,7 @@ static int prime_connection(zhandle_t *zh)
     req.lastZxidSeen = zh->last_zxid;
     hlen = htonl(len);
     /* We are running fast and loose here, but this string should fit in the initial buffer! */
-    rc=zookeeper_send(zh->fd, &hlen, sizeof(len));
+    rc=zookeeper_send(zh->fd, (const char*)&hlen, sizeof(len));
     serialize_prime_connect(&req, buffer_req);
     rc=rc<0 ? rc : zookeeper_send(zh->fd, buffer_req, len);
     if (rc<0) {
@@ -1698,7 +1698,11 @@ static int check_events(zhandle_t *zh, int events)
     if ((events&ZOOKEEPER_WRITE)&&(zh->state == ZOO_CONNECTING_STATE)) {
         int rc, error;
         socklen_t len = sizeof(error);
+#ifdef WIN32
+        rc = getsockopt(zh->fd, SOL_SOCKET, SO_ERROR, (char*)&error, &len);
+#else
         rc = getsockopt(zh->fd, SOL_SOCKET, SO_ERROR, &error, &len);
+#endif
         /* the description in section 16.4 "Non-blocking connect"
          * in UNIX Network Programming vol 1, 3rd edition, points out
          * that sometimes the error is in errno and sometimes in error */
