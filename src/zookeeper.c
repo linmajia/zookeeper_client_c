@@ -774,7 +774,7 @@ zhandle_t *zookeeper_init(const char *host, watcher_fn watcher,
 {
     int errnosave = 0;
     zhandle_t *zh = NULL;
-    char *index_chroot = NULL;
+    const char *index_chroot = NULL;
 
     log_env();
 #ifdef WIN32
@@ -3433,8 +3433,8 @@ int zoo_add_auth(zhandle_t *zh,const char* scheme,const char* cert,
 
 static const char* format_endpoint_info(const struct sockaddr_storage* ep)
 {
-    static char buf[128];
     char addrstr[128];
+    static char buf[sizeof(addrstr) + sizeof(":65535")];
     void *inaddr;
 #ifdef WIN32
     char * addrstring;
@@ -3456,10 +3456,10 @@ static const char* format_endpoint_info(const struct sockaddr_storage* ep)
 #endif
 #ifdef WIN32
     addrstring = inet_ntoa (*(struct in_addr*)inaddr); 
-    sprintf(buf,"%s:%d",addrstring,ntohs(port));
+    snprintf_z(buf, sizeof(buf), "%s:%d", addrstring, ntohs(port));
 #else
-    inet_ntop(ep->ss_family,inaddr,addrstr,sizeof(addrstr)-1);
-    sprintf(buf,"%s:%d",addrstr,ntohs(port));
+    inet_ntop(ep->ss_family, inaddr, addrstr, sizeof(addrstr)-1);
+    snprintf_z(buf, sizeof(buf), "%s:%d", addrstr, ntohs(port));
 #endif    
     return buf;
 }
